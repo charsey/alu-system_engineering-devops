@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Script to configure Nginx with a custom HTTP response header and set hostname
+
+# Update the system and install Nginx
+apt-get update -y
+apt-get install -y nginx
+
+# Set the hostname based on the specific student ID
+if [[ $(hostname) != "618120744-web-01" && $(hostname) != "618120744-web-02" ]]; then
+    echo "Setting the hostname to match the required format..."
+    if [[ $1 == "web-01" ]]; then
+        hostnamectl set-hostname 618120744-web-01
+    elif [[ $1 == "web-02" ]]; then
+        hostnamectl set-hostname 618120744-web-02
+    else
+        echo "Please specify 'web-01' or 'web-02' as an argument."
+        exit 1
+    fi
+fi
+
+# Create a test HTML page for the root
+echo "<html>
+<head>
+    <title>Welcome</title>
+</head>
+<body>
+    This is a test page served by $(hostname).
+</body>
+</html>" > /var/www/html/index.html
+
+# Configure Nginx to include a custom HTTP response header
+sed -i '/server {/a \\n    add_header X-Served-By \"$hostname\";' /etc/nginx/sites-enabled/default
+
+# Test the Nginx configuration for syntax errors
+nginx -t
+
+# Restart Nginx to apply changes
+service nginx restart
+
