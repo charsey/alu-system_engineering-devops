@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Update and install Nginx
+apt-get update -y
+apt-get install -y nginx
+
+# Create a custom HTML file for Nginx root
+echo "<html>
+<head>
+    <title>Welcome to Holberton School</title>
+</head>
+<body>
+    Holberton School for the win!
+</body>
+</html>" > /var/www/html/index.html
+
+# Restart Nginx without using systemctl
+service nginx stop
+service nginx start
+
+# Ensure Nginx starts on boot
+update-rc.d nginx defaults
+
