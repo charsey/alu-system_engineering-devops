@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
-# Update and install Nginx
-apt-get update -y
-apt-get install -y nginx
+# Installing Nginx on Ubuntu
+# Make sure the package list is up to date
+sudo apt-get update
+# Upgrade any out-of-date packages (optional)
+sudo apt-get upgrade -y
+# Install Nginx
+sudo apt-get install -y nginx
 
-# Create a custom HTML file for Nginx root
-echo "<html>
-<head>
-    <title>Welcome to Holberton School</title>
-</head>
-<body>
-    Holberton School for the win!
-</body>
-</html>" > /var/www/html/index.html
+# Ensure the default directory for Nginx exists (it should exist by default)
+# Create the HTML directory if it doesn't exist
+sudo mkdir -p /var/www/html
+
+# Create and write the required message into the index.html file
+echo "Holberton School for the win!" | sudo tee /var/www/html/index.html
 
 # Restart Nginx without using systemctl
-service nginx stop
-service nginx start
-
-# Ensure Nginx starts on boot
-update-rc.d nginx defaults
+sudo service nginx restart
 
