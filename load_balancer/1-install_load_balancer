@@ -1,61 +1,48 @@
 #!/usr/bin/env bash
-# This script installs and configures HAProxy on lb-01
-# It sets up round-robin load balancing between web-01 and web-02
+# Script to configure Nginx with a custom HTTP response header and set hostname
 
-# Variables
-WEB_01_IP="54.221.165.253"  # Replace with your actual web-01 IP
-WEB_02_IP="54.90.134.12"    # Replace with your actual web-02 IP
+# Update the system and install Nginx
+sudo apt-get update -y
+sudo apt-get install -y nginx
 
-# Update system and install HAProxy
-echo "Updating system and installing HAProxy..."
-sudo apt-get update -y && sudo apt-get install -y haproxy
+# Set the hostname based on the specific student ID
+if [[ $(hostname) != "618120744-web-01" && $(hostname) != "618120744-web-02" ]]; then
+    if [[ $1 == "web-01" ]]; then
+        sudo hostnamectl set-hostname 618120744-web-01
+    elif [[ $1 == "web-02" ]]; then
+        sudo hostnamectl set-hostname 618120744-web-02
+    else
+        echo "Error: Please specify 'web-01' or 'web-02' as an argument."
+        exit 1
+    fi
+fi
 
-# Configure HAProxy
-echo "Configuring HAProxy..."
-sudo tee /etc/haproxy/haproxy.cfg > /dev/null <<EOL
-# Global settings
-global
-    log /dev/log local0
-    log /dev/log local1 notice
-    chroot /var/lib/haproxy
-    stats timeout 30s
-    user haproxy
-    group haproxy
-    daemon
+# Ensure proper permissions for /var/www/html
+sudo mkdir -p /var/www/html
+sudo chmod -R 755 /var/www/html
+sudo chown -R www-data:www-data /var/www/html
 
-# Default settings
-defaults
-    log     global
-    option  httplog
-    option  dontlognull
-    timeout connect 5000ms
-    timeout client  50000ms
-    timeout server  50000ms
-    errorfile 400 /etc/haproxy/errors/400.http
-    errorfile 403 /etc/haproxy/errors/403.http
-    errorfile 408 /etc/haproxy/errors/408.http
-    errorfile 500 /etc/haproxy/errors/500.http
-    errorfile 502 /etc/haproxy/errors/502.http
-    errorfile 503 /etc/haproxy/errors/503.http
-    errorfile 504 /etc/haproxy/errors/504.http
+# Create a test HTML page that includes the hostname
+echo "<html>
+<head>
+    <title>Welcome</title>
+</head>
+<body>
+    This is a test page served by $(hostname).
+</body>
+</html>" | sudo tee /var/www/html/index.html > /dev/null
 
-# Frontend configuration
-frontend http_front
-    bind *:80
-    default_backend web_servers
+# Add custom HTTP response header in Nginx configuration
+if ! grep -q "add_header X-Served-By" /etc/nginx/sites-enabled/default; then
+    sudo sed -i '/server {/a \\n    add_header X-Served-By \"$hostname\";' /etc/nginx/sites-enabled/default
+fi
 
-# Backend configuration
-backend web_servers
-    balance roundrobin
-    server web-01 $WEB_01_IP:80 check
-    server web-02 $WEB_02_IP:80 check
-EOL
-
-# Enable and restart HAProxy service
-echo "Enabling and restarting HAProxy..."
-sudo systemctl enable haproxy
-sudo systemctl restart haproxy
-
-# Confirm setup
-echo "HAProxy has been installed and configured successfully!"
+# Test and reload Nginx configuration
+sudo nginx -t
+if [[ $? -eq 0 ]]; then
+    sudo service nginx reload
+else
+    echo "Nginx configuration test failed."
+    exit 1
+fi
 
