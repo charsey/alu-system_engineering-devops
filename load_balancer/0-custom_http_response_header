@@ -1,63 +1,28 @@
 #!/usr/bin/env bash
-# This script configures a new Ubuntu machine to meet the task requirements.
+# Bash script that configures a new Ubuntu machine nginx
+# Configuring Nginx HTTP response header
 
-# Exit on any error
-set -e
+sudo apt-get -y update
+sudo apt-get -y install nginx
+ufw allow  'Nginx HTTP'
 
-# Ensure the script is run as root
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root"
-  exit 1
-fi
+sudo echo "Holberton School" | sudo tee /var/www/html/index.html
 
-# Step 1: Update and upgrade the system
-echo "Updating system packages..."
-apt-get update -y && apt-get upgrade -y
+# redirection config
+replacement="server_name _;\\
+    rewrite ^/redirect_me https://github.com permanent;"
+sudo sed -i "s|server_name _;|$replacement|" /etc/nginx/sites-available/default
 
-# Step 2: Install Nginx
-echo "Installing Nginx..."
-apt-get install -y nginx
+#creating 404 error page
+echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
+page="listen 80 default_server;\\n\\terror_page 404 /404.html;\\n\\tlocation = /404.html {\\n\\t\\troot /var/www/html;\\n\\t\\tinternal;\\n\\t}"
+sudo sed -i "s|listen 80 default_server;|$page|" /etc/nginx/sites-available/default
 
-# Step 3: Get the current hostname
-hostname=$(hostname)
 
-# Step 4: Configure Nginx with a custom header
-echo "Configuring Nginx..."
-cat > /etc/nginx/conf.d/custom_headers.conf <<EOF
-server {
-    listen 80 default_server;
-    server_name _;
+# Creating an HTTP response header
+sudo sed -i "/server_name _/a add_header X-Served-By $HOSTNAME;" /etc/nginx/sites-available/default
 
-    location / {
-        add_header X-Served-By $hostname;
-        return 200 "Hello from $hostname\n";
-        add_header Content-Type text/plain;
-    }
-}
-EOF
 
-# Step 5: Remove the default site configuration
-if [ -f /etc/nginx/sites-enabled/default ]; then
-  echo "Removing default Nginx configuration..."
-  rm /etc/nginx/sites-enabled/default
-fi
-
-# Step 6: Test and reload Nginx configuration
-echo "Testing Nginx configuration..."
-nginx -t
-
-echo "Reloading Nginx..."
-systemctl reload nginx
-
-# Step 7: Verify the custom header is applied
-echo "Verifying the custom header..."
-header_count=$(curl -sI http://localhost | grep -Fi 'X-Served-By' | wc -l)
-
-if [ "$header_count" -eq 1 ]; then
-  echo "Custom header setup successful."
-  exit 0
-else
-  echo "Custom header setup failed."
-  exit 1
-fi
-
+# config testing and starting
+sudo nginx -t
+sudo service nginx start
