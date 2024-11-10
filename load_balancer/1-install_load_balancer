@@ -1,42 +1,61 @@
 #!/usr/bin/env bash
-# Update package list
-sudo apt-get update
+# This script installs and configures HAProxy on lb-01
+# It sets up round-robin load balancing between web-01 and web-02
 
-# Install HAProxy
-sudo apt-get install -y haproxy
+# Variables
+WEB_01_IP="54.221.165.253"  # Replace with your actual web-01 IP
+WEB_02_IP="54.90.134.12"    # Replace with your actual web-02 IP
+
+# Update system and install HAProxy
+echo "Updating system and installing HAProxy..."
+sudo apt-get update -y && sudo apt-get install -y haproxy
 
 # Configure HAProxy
-sudo mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak  # Backup existing config file
-
-# Create a new HAProxy configuration file
-sudo tee /etc/haproxy/haproxy.cfg > /dev/null <<'EOF'
+echo "Configuring HAProxy..."
+sudo tee /etc/haproxy/haproxy.cfg > /dev/null <<EOL
+# Global settings
 global
-    log /dev/log    local0
-    log /dev/log    local1 notice
+    log /dev/log local0
+    log /dev/log local1 notice
     chroot /var/lib/haproxy
-    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
     stats timeout 30s
     user haproxy
     group haproxy
     daemon
 
+# Default settings
 defaults
     log     global
-    mode    http
     option  httplog
     option  dontlognull
-    timeout connect 5000
-    timeout client  50000
-    timeout server  50000
+    timeout connect 5000ms
+    timeout client  50000ms
+    timeout server  50000ms
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 408 /etc/haproxy/errors/408.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http
 
-frontend main
+# Frontend configuration
+frontend http_front
     bind *:80
-    default_backend app
+    default_backend web_servers
 
-backend app
+# Backend configuration
+backend web_servers
     balance roundrobin
-    server web-01 3.84.243.206:80 check
-    server web-02 54.236.20.3:80 check
-EOF
+    server web-01 $WEB_01_IP:80 check
+    server web-02 $WEB_02_IP:80 check
+EOL
 
-# Ensure HAProxy can be managed via an init script
+# Enable and restart HAProxy service
+echo "Enabling and restarting HAProxy..."
+sudo systemctl enable haproxy
+sudo systemctl restart haproxy
+
+# Confirm setup
+echo "HAProxy has been installed and configured successfully!"
+
