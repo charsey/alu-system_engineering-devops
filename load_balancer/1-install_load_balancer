@@ -1,48 +1,29 @@
 #!/usr/bin/env bash
-# Script to configure Nginx with a custom HTTP response header and set hostname
+# Create a script to install and configure HAProxy on lb-01 server
+# Configure HAProxy to send traffic to web-01 and web-02 servers
 
-# Update the system and install Nginx
-sudo apt-get update -y
-sudo apt-get install -y nginx
 
-# Set the hostname based on the specific student ID
-if [[ $(hostname) != "618120744-web-01" && $(hostname) != "618120744-web-02" ]]; then
-    if [[ $1 == "web-01" ]]; then
-        sudo hostnamectl set-hostname 618120744-web-01
-    elif [[ $1 == "web-02" ]]; then
-        sudo hostnamectl set-hostname 618120744-web-02
-    else
-        echo "Error: Please specify 'web-01' or 'web-02' as an argument."
-        exit 1
-    fi
-fi
+# Install and configure HAproxy on my lb-01 server.
+sudo apt-get -y update
+sudo apt-get -y install haproxy
 
-# Ensure proper permissions for /var/www/html
-sudo mkdir -p /var/www/html
-sudo chmod -R 755 /var/www/html
-sudo chown -R www-data:www-data /var/www/html
+# edit config file
+server_config=\
+"
+frontend  charsey_frontend
+        bind *:80
+        mode http
+        default_backend charsey_backend
+backend charsey_backend
+        balance roundrobin
+    server web-01 54.221.165.253:80 check
+    server web-02 54.90.134.12:80 check
+"
+echo "$server_config" | sudo tee -a /etc/haproxy/haproxy.cfg
 
-# Create a test HTML page that includes the hostname
-echo "<html>
-<head>
-    <title>Welcome</title>
-</head>
-<body>
-    This is a test page served by $(hostname).
-</body>
-</html>" | sudo tee /var/www/html/index.html > /dev/null
+# enable haproxy to be started by init script
+echo "ENABLED=1" | sudo tee -a /etc/default/haproxy/
 
-# Add custom HTTP response header in Nginx configuration
-if ! grep -q "add_header X-Served-By" /etc/nginx/sites-enabled/default; then
-    sudo sed -i '/server {/a \\n    add_header X-Served-By \"$hostname\";' /etc/nginx/sites-enabled/default
-fi
-
-# Test and reload Nginx configuration
-sudo nginx -t
-if [[ $? -eq 0 ]]; then
-    sudo service nginx reload
-else
-    echo "Nginx configuration test failed."
-    exit 1
-fi
-
+# Testing the HAproxy configuration file
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg
+sudo service haproxy restart
