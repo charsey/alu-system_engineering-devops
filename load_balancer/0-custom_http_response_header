@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
+# This script configures an Ubuntu machine with Nginx and sets a custom HTTP response header.
+
 # Ensure the script is run as root
 if [ "$EUID" -ne 0 ]; then
   echo "Please run as root"
   exit
 fi
 
-# Update package list and upgrade the system
+# Update and install Nginx
 echo "Updating package list and upgrading system..."
 apt-get update && apt-get upgrade -y
 
-# Install Nginx
 echo "Installing Nginx..."
 apt-get install -y nginx
 
 # Get the current hostname
 hostname=$(hostname)
 
-# Create a custom Nginx configuration file with X-Served-By header
-echo "Configuring Nginx with custom headers..."
+# Create a custom Nginx configuration file
+echo "Configuring Nginx to include the X-Served-By header..."
 cat > /etc/nginx/conf.d/custom_headers.conf <<EOF
 server {
     listen 80 default_server;
@@ -25,27 +26,26 @@ server {
 
     location / {
         add_header X-Served-By $hostname;
-        return 200 'Welcome to the server!';
+        # Optional: A simple response for verification
+        return 200 'Welcome to $hostname!';
         add_header Content-Type text/plain;
     }
 }
 EOF
 
-# Remove the default Nginx site configuration if it exists
+# Remove the default Nginx configuration if it exists
 if [ -f /etc/nginx/sites-enabled/default ]; then
   echo "Removing default Nginx site configuration..."
   rm /etc/nginx/sites-enabled/default
 fi
 
-# Test Nginx configuration for syntax errors
+# Test and apply the configuration
 echo "Testing Nginx configuration..."
 nginx -t
 
-# Restart Nginx to apply changes
-echo "Restarting Nginx..."
+echo "Restarting Nginx to apply changes..."
 systemctl restart nginx
 
-# Output status
-echo "Configuration complete. Your server is now set up with Nginx."
-echo "You can test the setup by accessing the server's IP address in a web browser or using curl."
+# Output completion message
+echo "Configuration complete. Nginx is serving responses with the X-Served-By header."
 
