@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# This script configures an Ubuntu machine with Nginx and sets a custom HTTP response header.
+# This script configures an Ubuntu machine with Nginx to include the X-Served-By custom header.
+
+# Exit on any error
+set -e
 
 # Ensure the script is run as root
 if [ "$EUID" -ne 0 ]; then
   echo "Please run as root"
-  exit
+  exit 1
 fi
 
-# Update and install Nginx
-echo "Updating package list and upgrading system..."
-apt-get update && apt-get upgrade -y
+# Update and upgrade system packages
+echo "Updating and upgrading system packages..."
+apt-get update -y && apt-get upgrade -y
 
+# Install Nginx if not already installed
 echo "Installing Nginx..."
 apt-get install -y nginx
 
@@ -18,7 +22,7 @@ apt-get install -y nginx
 hostname=$(hostname)
 
 # Create a custom Nginx configuration file
-echo "Configuring Nginx to include the X-Served-By header..."
+echo "Creating Nginx configuration with X-Served-By header..."
 cat > /etc/nginx/conf.d/custom_headers.conf <<EOF
 server {
     listen 80 default_server;
@@ -26,26 +30,38 @@ server {
 
     location / {
         add_header X-Served-By $hostname;
-        # Optional: A simple response for verification
-        return 200 'Welcome to $hostname!';
+        return 200 "Welcome to $hostname\n";
         add_header Content-Type text/plain;
     }
 }
 EOF
 
-# Remove the default Nginx configuration if it exists
+# Remove the default Nginx site configuration if it exists
 if [ -f /etc/nginx/sites-enabled/default ]; then
   echo "Removing default Nginx site configuration..."
   rm /etc/nginx/sites-enabled/default
 fi
 
-# Test and apply the configuration
+# Test the Nginx configuration
 echo "Testing Nginx configuration..."
-nginx -t
+if ! nginx -t; then
+  echo "Nginx configuration test failed!"
+  exit 1
+fi
 
-echo "Restarting Nginx to apply changes..."
+# Restart Nginx to apply the new configuration
+echo "Restarting Nginx..."
 systemctl restart nginx
 
-# Output completion message
-echo "Configuration complete. Nginx is serving responses with the X-Served-By header."
+# Verify the setup
+echo "Verifying the custom header setup..."
+response=$(curl -sI localhost | grep -Fi 'X-Served-By' | wc -l)
+if [ "$response" -eq 1 ]; then
+  echo "Custom header setup successful."
+else
+  echo "Custom header setup failed. Please check the configuration."
+  exit 1
+fi
+
+echo "Configuration complete. Your server is ready with the custom X-Served-By header."
 
