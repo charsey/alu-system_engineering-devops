@@ -1,24 +1,28 @@
 #!/usr/bin/env bash
 # Script to configure Nginx with a custom HTTP response header and set hostname
 
-# Update the system and install Nginx
-apt-get update -y
-apt-get install -y nginx
+# Update and install Nginx
+sudo apt-get update -y
+sudo apt-get install -y nginx
 
-# Set the hostname based on the specific student ID
+# Set the hostname
 if [[ $(hostname) != "618120744-web-01" && $(hostname) != "618120744-web-02" ]]; then
-    echo "Setting the hostname to match the required format..."
     if [[ $1 == "web-01" ]]; then
-        hostnamectl set-hostname 618120744-web-01
+        sudo hostnamectl set-hostname 618120744-web-01
     elif [[ $1 == "web-02" ]]; then
-        hostnamectl set-hostname 618120744-web-02
+        sudo hostnamectl set-hostname 618120744-web-02
     else
-        echo "Please specify 'web-01' or 'web-02' as an argument."
+        echo "Error: Please specify 'web-01' or 'web-02' as an argument."
         exit 1
     fi
 fi
 
-# Create a test HTML page for the root
+# Ensure proper permissions for /var/www/html
+sudo mkdir -p /var/www/html
+sudo chmod -R 755 /var/www/html
+sudo chown -R www-data:www-data /var/www/html
+
+# Create a test HTML page
 echo "<html>
 <head>
     <title>Welcome</title>
@@ -26,13 +30,19 @@ echo "<html>
 <body>
     This is a test page served by $(hostname).
 </body>
-</html>" > /var/www/html/index.html
+</html>" | sudo tee /var/www/html/index.html > /dev/null
 
-# Configure Nginx to include a custom HTTP response header
-sed -i '/server {/a \\n    add_header X-Served-By \"$hostname\";' /etc/nginx/sites-enabled/default
+# Add custom HTTP response header
+if ! grep -q "add_header X-Served-By" /etc/nginx/sites-enabled/default; then
+    sudo sed -i '/server {/a \\n    add_header X-Served-By \"$hostname\";' /etc/nginx/sites-enabled/default
+fi
 
-# Test the Nginx configuration for syntax errors
-nginx -t
+# Test and reload Nginx configuration
+sudo nginx -t
+if [[ $? -eq 0 ]]; then
+    sudo service nginx reload
+else
+    echo "Nginx configuration test failed."
+    exit 1
+fi
 
-# Restart Nginx to apply changes
-service nginx restart
