@@ -36,4 +36,3 @@ nginx -t
 
 # Restart Nginx to apply changes
 service nginx restart
-
