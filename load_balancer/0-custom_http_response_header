@@ -1,48 +1,28 @@
 #!/usr/bin/env bash
-# Script to configure Nginx with a custom HTTP response header and set hostname
+# Update package list
+sudo apt-get update
 
-# Update and install Nginx
-sudo apt-get update -y
+# Install Nginx
 sudo apt-get install -y nginx
 
-# Set the hostname
-if [[ $(hostname) != "618120744-web-01" && $(hostname) != "618120744-web-02" ]]; then
-    if [[ $1 == "web-01" ]]; then
-        sudo hostnamectl set-hostname 618120744-web-01
-    elif [[ $1 == "web-02" ]]; then
-        sudo hostnamectl set-hostname 618120744-web-02
-    else
-        echo "Error: Please specify 'web-01' or 'web-02' as an argument."
-        exit 1
-    fi
-fi
+# Get the current hostname
+hostname=$(hostname)
 
-# Ensure proper permissions for /var/www/html
-sudo mkdir -p /var/www/html
-sudo chmod -R 755 /var/www/html
-sudo chown -R www-data:www-data /var/www/html
+# Create a custom Nginx configuration file with X-Served-By header
+sudo tee /etc/nginx/conf.d/custom_headers.conf > /dev/null <<'EOF'
+server {
+    listen 80 default_server;
+    server_name _;
 
-# Create a test HTML page
-echo "<html>
-<head>
-    <title>Welcome</title>
-</head>
-<body>
-    This is a test page served by $(hostname).
-</body>
-</html>" | sudo tee /var/www/html/index.html > /dev/null
+    location / {
+        add_header X-Served-By $hostname;
+        # Additional configuration if needed
+    }
+}
+EOF
 
-# Add custom HTTP response header
-if ! grep -q "add_header X-Served-By" /etc/nginx/sites-enabled/default; then
-    sudo sed -i '/server {/a \\n    add_header X-Served-By \"$hostname\";' /etc/nginx/sites-enabled/default
-fi
+# Remove the default Nginx default site configuration
+sudo rm /etc/nginx/sites-enabled/default
 
-# Test and reload Nginx configuration
-sudo nginx -t
-if [[ $? -eq 0 ]]; then
-    sudo service nginx reload
-else
-    echo "Nginx configuration test failed."
-    exit 1
-fi
-
+# Restart Nginx to apply changes
+sudo systemctl restart nginx
