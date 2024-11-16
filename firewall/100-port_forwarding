@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Install UFW and configure port forwarding
+
+sudo apt install -y ufw
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22
+sudo ufw allow 80
+sudo ufw allow 443
+
+# Edit UFW NAT rules for port forwarding
+sudo sed -i '/^# End required lines/a\
+*nat\n\
+:PREROUTING ACCEPT [0:0]\n\
+-A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 80\n\
+COMMIT' /etc/ufw/before.rules
+
+# Enable UFW
+echo "y" | sudo ufw enable
+sudo ufw reload
